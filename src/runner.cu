@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 
 float get_sec() {
   struct timeval time;
@@ -104,16 +105,38 @@ void print_matrix(const float *A, int M, int N, std::ofstream &fs) {
 }
 
 bool verify_matrix(float *matRef, float *matOut, int N) {
-  double diff = 0.0;
+  float absToler = 1e-5;
+  float relToler = 1e-3;
   int i;
   for (i = 0; i < N; i++) {
-    diff = std::fabs(matRef[i] - matOut[i]);
-    if (diff > 0.01) {
-      printf("Divergence! Should %5.2f, Is %5.2f (Diff %5.2f) at %d\n",
+    float diff = std::fabs(matRef[i] - matOut[i]);
+    if (diff > absToler && diff > std::fabs(matRef[i]) * relToler) {
+      printf("Divergence! Should %f, Is %f (Diff %f) at %d\n",
              matRef[i], matOut[i], diff, i);
       return false;
     }
   }
+  return true;
+}
+
+bool verifyMatrix(int M, int N, int K, const float *A, const float *B, const float *C) {
+  float absToler = 1e-5;
+  float relToler = 1e-4;
+
+  for (int i = 0; i < M; ++i) {
+    for (int j = 0; j < N; ++j) {
+      float acc = 0.0;
+      for (int k = 0; k < K; ++k)
+        acc += A[i*K + k] * B[k*N + j];
+      float diff = std::fabs(C[i*N + j] - acc);
+      if (diff > absToler && diff > std::fabs(C[i*N+j]) * relToler) {
+        printf("Divergence! Should %f, Is %f (Diff %f) at (%d, %d)\n",
+              acc,  C[i*N+j], diff, i, j);
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 

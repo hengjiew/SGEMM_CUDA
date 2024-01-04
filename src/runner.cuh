@@ -18,6 +18,7 @@ void zero_init_matrix(float *mat, int N);
 void copy_matrix(const float *src, float *dest, int N);
 void print_matrix(const float *A, int M, int N, std::ofstream &fs);
 bool verify_matrix(float *mat1, float *mat2, int N);
+bool verifyMatrix(int M, int N, int K, const float *a, const float *, const float*);
 
 float get_current_sec();                        // Get the current moment
 float cpu_elapsed_time(float &beg, float &end); // Calculate time difference

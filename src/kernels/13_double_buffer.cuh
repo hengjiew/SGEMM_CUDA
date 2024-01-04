@@ -235,7 +235,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
       // if (threadIdx.x == 0) {
       //   printf("kTile %d  k %d buffer id %d %d c41 %f a4k %f bk1 %f\n",
       //          kTileId, kTileId * BK + k, bufferId, nextBufferId,
-      //          cFrag[4][1], aFrag[bufferId][4], bFrag[bufferId][1]);
+      //          cFrag[0][0], aFrag[bufferId][0], bFrag[bufferId][0]);
       // }
 
       bufferId ^= 0x1;
@@ -246,22 +246,26 @@ __global__ void __launch_bounds__(NUM_THREADS)
   // FFMA for the last tile.
   #pragma unroll
   for (int k = 0; k < BK; ++k) {
-    uint bufferId = (k + 1) % 2;
+    // uint bufferId = (k + 1) % 2;
     uint kNext = (k + 1) % BK;
 
     if (k < BK - 1) {
       // Load next A fragments from shared memory.
       #pragma unroll
       for (int i = 0; i < TM; i += 4)
-        lds128(aFrag[bufferId][i], aFrag[bufferId][i + 1],
-              aFrag[bufferId][i + 2], aFrag[bufferId][i + 3],
-              aLdsAddr + (kNext * BMPadded + i * warpDimY) * sizeof(float));
+        lds128(aFrag[nextBufferId][i],
+               aFrag[nextBufferId][i + 1],
+               aFrag[nextBufferId][i + 2],
+               aFrag[nextBufferId][i + 3],
+               aLdsAddr + (kNext * BMPadded + i * warpDimY) * sizeof(float));
 
       // Load next B fragments from shared memory.
       #pragma unroll
       for (int i = 0; i < TN; i += 4)
-        lds128(bFrag[bufferId][i], bFrag[bufferId][i + 1],
-               bFrag[bufferId][i + 2], bFrag[bufferId][i + 3],
+        lds128(bFrag[nextBufferId][i],
+               bFrag[nextBufferId][i + 1],
+               bFrag[nextBufferId][i + 2],
+               bFrag[nextBufferId][i + 3],
                bLdsAddr + (kNext * BN + i * warpDimX) * sizeof(float));
     }// end if
 
@@ -275,8 +279,10 @@ __global__ void __launch_bounds__(NUM_THREADS)
     // if (threadIdx.x == 0) {
     //   printf("kTile %d  k %d buffer id %d %d c41 %f a4k %f bk1 %f\n",
     //           numKTiles-1, (numKTiles-1) * BK + k, bufferId, nextBufferId,
-    //           cFrag[4][1], aFrag[bufferId][4], bFrag[bufferId][1]);
+    //           cFrag[0][0], aFrag[bufferId][0], bFrag[bufferId][0]);
     // }
+    bufferId ^= 0x1;
+    nextBufferId ^= 0x1;
   } // end for k.
 
 

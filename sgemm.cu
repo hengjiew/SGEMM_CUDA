@@ -56,11 +56,12 @@ int main(int argc, char **argv) {
 
   // cuBLAS FLOPs ceiling is reached at 8192
   std::vector<std::tuple<size_t, size_t, size_t>> SIZE = {
-    std::make_tuple(128, 128, 128)
-    // std::make_tuple(1024, 1024, 128),
-    // std::make_tuple(2048, 2048, 128),
-    // std::make_tuple(4096, 4096, 128),
-    // std::make_tuple(8192, 8192, 128),
+    // std::make_tuple(128, 128, 128)
+    // std::make_tuple(256, 256, 128)
+    std::make_tuple(1024, 1024, 128),
+    std::make_tuple(2048, 2048, 128),
+    std::make_tuple(4096, 4096, 128),
+    std::make_tuple(8192, 8192, 128),
   };
 
   size_t max_size = std::get<0>(SIZE.back());
@@ -79,14 +80,14 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * max_size * max_size);
   C_ref = (float *)malloc(sizeof(float) * max_size * max_size);
 
-  // std::fill(A, A + max_size * max_size, 1.0f);
-  // std::fill(B, B + max_size * max_size, 1.0f);
-  for (int i = 0; i < max_size; ++i) {
-    for (int j = 0; j < max_size; ++j) {
-      A[i*max_size + j] = float(i);
-      B[i*max_size + j] = float(j);
-    }
-  }
+  // for (int i = 0; i < max_size; ++i) {
+  //   for (int j = 0; j < max_size; ++j) {
+  //     A[i*max_size + j] = float(i);
+  //     B[i*max_size + j] = float(j);
+  //   }
+  // }
+  range_init_matrix(A, max_size * max_size);
+  range_init_matrix(B, max_size * max_size);
   std::fill(C, C + max_size * max_size, 0.0f);
 
   // randomize_matrix(A, max_size * max_size);
@@ -107,7 +108,7 @@ int main(int argc, char **argv) {
   cudaCheck(cudaMemcpy(dC_ref, C, sizeof(float) * max_size * max_size,
                        cudaMemcpyHostToDevice));
 
-  int repeat_times = 0;
+  int repeat_times = 1000;
   for (auto& [m, n, k] : SIZE) {
     std::cout << "dimensions " << m << " " << n << " " << k << ", alpha: " << alpha
               << ", beta: " << beta << std::endl;
