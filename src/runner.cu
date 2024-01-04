@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 
 float get_sec() {
   struct timeval time;
@@ -501,6 +502,32 @@ void runSgemmDoubleBuffering2(int M, int N, int K, float alpha, float *A,
       <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
+void runSgemmDoubleBuffering3(int M, int N, int K, float alpha, float *A,
+                              float *B, float beta, float *C) {
+  const uint K13_NUM_THREADS = 256;
+  const uint K13_BN = 128;
+  const uint K13_BM = 128;
+  const uint K13_BK = 8;
+  const uint K13_WN = 64;
+  const uint K13_WM = 32;
+  const uint K13_TN = 8;
+  const uint K13_TM = 8;
+  dim3 blockDim(K13_NUM_THREADS);
+
+  constexpr uint NUM_WARPS = K13_NUM_THREADS / 32;
+
+  // warptile in threadblocktile
+  static_assert((K13_BN % K13_WN == 0) and (K13_BM % K13_WM == 0));
+  static_assert((K13_BN / K13_WN) * (K13_BM / K13_WM) == NUM_WARPS);
+  static_assert(K13_WN % K13_TN == 0 && K13_WM % K13_TM == 0);
+
+  dim3 gridDim(CEIL_DIV(N, K13_BN), CEIL_DIV(M, K13_BM));
+  // std::cout << CEIL_DIV(N, K13_BN) << " " << CEIL_DIV(M, K13_BM) << "\n";
+  runSgemmDoubleBuffering3<K13_BM, K13_BN, K13_BK, K13_WM, K13_WN, K13_TM,
+                           K13_TN, K13_NUM_THREADS>
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+}
+
 void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
                 float *B, float beta, float *C, cublasHandle_t handle) {
   switch (kernel_num) {
@@ -542,6 +569,9 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
     break;
   case 12:
     runSgemmDoubleBuffering2(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 13:
+    runSgemmDoubleBuffering3(M, N, K, alpha, A, B, beta, C);
     break;
   default:
     throw std::invalid_argument("Unknown kernel number");

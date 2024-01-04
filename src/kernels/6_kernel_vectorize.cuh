@@ -9,6 +9,17 @@
 
 #define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
+__device__ __forceinline__
+float4 ldg_cs(const void *ptr) {
+    float4 ret;
+    asm volatile (
+        "ld.global.cs.v4.f32 {%0, %1, %2, %3}, [%4];"
+        : "=f"(ret.x), "=f"(ret.y), "=f"(ret.z), "=f"(ret.w)
+        : "l"(ptr)
+    );
+    return ret;
+}
+
 template <const int BM, const int BN, const int BK, const int TM, const int TN>
 __global__ void sgemmVectorize(int M, int N, int K, float alpha, float *A,
                                float *B, float beta, float *C) {
@@ -44,8 +55,8 @@ __global__ void sgemmVectorize(int M, int N, int K, float alpha, float *A,
   for (uint bkIdx = 0; bkIdx < K; bkIdx += BK) {
     // populate the SMEM caches
     // transpose A while loading it
-    float4 tmp =
-        reinterpret_cast<float4 *>(&A[innerRowA * K + innerColA * 4])[0];
+    float4 tmp = reinterpret_cast<float4 *>(&A[innerRowA * K + innerColA * 4])[0];
+    // float4 tmp = ldg_cs(&A[innerRowA * K + innerColA * 4]);
     As[(innerColA * 4 + 0) * BM + innerRowA] = tmp.x;
     As[(innerColA * 4 + 1) * BM + innerRowA] = tmp.y;
     As[(innerColA * 4 + 2) * BM + innerRowA] = tmp.z;

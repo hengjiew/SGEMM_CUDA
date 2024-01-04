@@ -5,6 +5,8 @@
 #include <iostream>
 #include <runner.cuh>
 #include <vector>
+#include <tuple>
+#include <algorithm>
 
 #define cudaCheck(err) (cudaCheck(err, __FILE__, __LINE__))
 
@@ -19,8 +21,8 @@ int main(int argc, char **argv) {
 
   // get kernel number
   int kernel_num = std::stoi(argv[1]);
-  if (kernel_num < 0 || kernel_num > 12) {
-    std::cerr << "Please enter a valid kernel number (0-12)" << std::endl;
+  if (kernel_num < 0 || kernel_num > 13) {
+    std::cerr << "Please enter a valid kernel number (0-13)" << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -53,13 +55,19 @@ int main(int argc, char **argv) {
   cudaEventCreate(&end);
 
   // cuBLAS FLOPs ceiling is reached at 8192
-  std::vector<int> SIZE = {128, 256, 512, 1024, 2048, 4096};
+  std::vector<std::tuple<size_t, size_t, size_t>> SIZE = {
+    std::make_tuple(128, 128, 128)
+    // std::make_tuple(1024, 1024, 128),
+    // std::make_tuple(2048, 2048, 128),
+    // std::make_tuple(4096, 4096, 128),
+    // std::make_tuple(8192, 8192, 128),
+  };
 
-  long m, n, k, max_size;
-  max_size = SIZE[SIZE.size() - 1];
-  std::cout << "Max size: " << max_size << std::endl;
+  size_t max_size = std::get<0>(SIZE.back());
+  //max_size = SIZE[SIZE.size() - 1];
+  //std::cout << "Max size: " << max_size << std::endl;
 
-  float alpha = 0.5, beta = 3.0; // GEMM input parameters, C=α*AB+β*C
+  float alpha = 1.0, beta = 0.0; // GEMM input parameters, C=α*AB+β*C
 
   float *A = nullptr, *B = nullptr, *C = nullptr,
         *C_ref = nullptr; // host matrices
@@ -71,9 +79,19 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * max_size * max_size);
   C_ref = (float *)malloc(sizeof(float) * max_size * max_size);
 
-  randomize_matrix(A, max_size * max_size);
-  randomize_matrix(B, max_size * max_size);
-  randomize_matrix(C, max_size * max_size);
+  // std::fill(A, A + max_size * max_size, 1.0f);
+  // std::fill(B, B + max_size * max_size, 1.0f);
+  for (int i = 0; i < max_size; ++i) {
+    for (int j = 0; j < max_size; ++j) {
+      A[i*max_size + j] = float(i);
+      B[i*max_size + j] = float(j);
+    }
+  }
+  std::fill(C, C + max_size * max_size, 0.0f);
+
+  // randomize_matrix(A, max_size * max_size);
+  // randomize_matrix(B, max_size * max_size);
+  // randomize_matrix(C, max_size * max_size);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * max_size * max_size));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * max_size * max_size));
@@ -89,11 +107,9 @@ int main(int argc, char **argv) {
   cudaCheck(cudaMemcpy(dC_ref, C, sizeof(float) * max_size * max_size,
                        cudaMemcpyHostToDevice));
 
-  int repeat_times = 50;
-  for (int size : SIZE) {
-    m = n = k = size;
-
-    std::cout << "dimensions(m=n=k) " << m << ", alpha: " << alpha
+  int repeat_times = 0;
+  for (auto& [m, n, k] : SIZE) {
+    std::cout << "dimensions " << m << " " << n << " " << k << ", alpha: " << alpha
               << ", beta: " << beta << std::endl;
     // Verify the correctness of the calculation, and execute it once before the
     // kernel function timing to avoid cold start errors
@@ -143,9 +159,9 @@ int main(int argc, char **argv) {
     long flops = 2 * m * n * k;
     printf(
         "Average elapsed time: (%7.6f) s, performance: (%7.1f) GFLOPS. size: "
-        "(%ld).\n",
+        "(%ld, %ld, %ld).\n",
         elapsed_time / repeat_times,
-        (repeat_times * flops * 1e-9) / elapsed_time, m);
+        (repeat_times * flops * 1e-9) / elapsed_time, m, n, k);
     fflush(stdout);
     // make dC and dC_ref equal again (we modified dC while calling our kernel
     // for benchmarking)
