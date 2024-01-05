@@ -66,9 +66,9 @@ void randomize_matrix(float *mat, int N) {
   }
 }
 
-void range_init_matrix(float *mat, int N) {
-  for (int i = 0; i < N; i++) {
-    mat[i] = i;
+void range_init_matrix(float *mat, size_t N) {
+  for (size_t i = 0; i < N; i++) {
+    mat[i] = float(i);
   }
 }
 
