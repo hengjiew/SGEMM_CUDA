@@ -530,7 +530,7 @@ void runSgemmDoubleBuffering3(int M, int N, int K, float alpha, float *A,
   const uint K13_NUM_THREADS = 256;
   const uint K13_BN = 128;
   const uint K13_BM = 128;
-  const uint K13_BK = 8;
+  const uint K13_BK = 16;
   const uint K13_WN = 64;
   const uint K13_WM = 32;
   const uint K13_TN = 8;
