@@ -95,11 +95,12 @@ __global__ void __launch_bounds__(NUM_THREADS)
   // Thread swizzled mapping.
   // The warp has a 2D layout: warpDimX x warpDimY. (mmaTidX, mmaTidY) is the
   // thread coordinate in the warp.
-  // Use identity mapping for now.
-  const uint mmaTidX = laneId % warpDimX;
-  const uint mmaTidY = laneId / warpDimX;
-  // const uint32_t mmaTidX = (lane_id / 2) % TN;
-  // const uint32_t mmaTidY = (lane_id / TM) * 2 + (lane_id % 2);
+  // Identity mapping.
+  // const uint mmaTidX = laneId % warpDimX;
+  // const uint mmaTidY = laneId / warpDimX;
+  // Swizzled mapping, see https://github.com/hengjiew/YHs_Sample/blob/master/cuda/gemm/ampere_sgemm.cu
+  const uint32_t mmaTidX = (laneId / 2) % warpDimX;
+  const uint32_t mmaTidY = (laneId / 2) / warpDimX * 2 + (laneId % 2);
 
   // Each thread load one element from A.
   constexpr uint numLoadAIters = BM * BK / NUM_THREADS;
