@@ -80,12 +80,6 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * max_size * max_size);
   C_ref = (float *)malloc(sizeof(float) * max_size * max_size);
 
-  // for (int i = 0; i < max_size; ++i) {
-  //   for (int j = 0; j < max_size; ++j) {
-  //     A[i*max_size + j] = float(i);
-  //     B[i*max_size + j] = float(j);
-  //   }
-  // }
   range_init_matrix(A, max_size * max_size);
   range_init_matrix(B, max_size * max_size);
   std::fill(C, C + max_size * max_size, 0.0f);

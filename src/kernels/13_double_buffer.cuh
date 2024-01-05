@@ -105,6 +105,11 @@ __global__ void __launch_bounds__(NUM_THREADS)
   const uint loadBX = threadIdx.x % BN;
   const uint loadBY = threadIdx.x / BN;
 
+  // The FFMA loops overlap each round of loading with one computation iteration.
+  // This requires the number of rounds is less than BK.
+  static_assert(numLoadAIters < BK);
+  static_assert(numLoadBIters < BK);
+
   uint32_t aStsAddr =
       smemU32Addr(aSmem + (threadIdx.x % BK) * BMPadded + (threadIdx.x / BK));
   // B_smem has very similar layout as B global memory.
@@ -150,11 +155,6 @@ __global__ void __launch_bounds__(NUM_THREADS)
     bStsAddr += bSmemAddrShift;
   }
 
-  // if (threadIdx.x == 0) {
-  //   for (int i = 0; i < BK; ++i)
-  //     printf("bsmem value %f\n", bSmem[i*BN]);
-  // }
-
   uint aLdsAddr = smemU32Addr(aSmem + warpIdY * WM + mmaTidY * 4);
   uint bLdsAddr = smemU32Addr(bSmem + warpIdX * WN + mmaTidX * 4);
 
@@ -199,8 +199,6 @@ __global__ void __launch_bounds__(NUM_THREADS)
         // Advance to global memory pointer to next tile.
         aLdgPtr += BK * sizeof(float);
         bLdgPtr += BK * N * sizeof(float);
-        // A += BK * sizeof(float);
-        // B += BK * N * sizeof(float);
       }
 
       // Load next A fragments from shared memory.
@@ -217,17 +215,15 @@ __global__ void __launch_bounds__(NUM_THREADS)
                bLdsAddr + (kNext * BN + i * warpDimX) * sizeof(float));
 
       // Load next K tile from global memory to shared memory.
-      if (k < numLoadAIters && k % 2 == 0) {
+      // Assumie BK > numLoadAIters
+      if (k < numLoadAIters) {
         ldgsts32Async(aStsAddr + k * numLoadARowsPerIter * sizeof(float),
                       aLdgPtr + k * numLoadARowsPerIter  * K * sizeof(float));
-        ldgsts32Async(aStsAddr + (k+1) * numLoadARowsPerIter * sizeof(float),
-                      aLdgPtr + (k+1) * numLoadARowsPerIter  * K * sizeof(float));
       }
-      if (k < numLoadBIters && k % 2 == 0) {
+      // Assumie BK > numLoadBIters
+      if (k < numLoadBIters) {
         ldgsts32Async(bStsAddr + k * numLoadBRowsPerIter * BN * sizeof(float),
                       bLdgPtr + k * numLoadBRowsPerIter * N * sizeof(float));
-        ldgsts32Async(bStsAddr + (k+1) * numLoadBRowsPerIter * BN * sizeof(float),
-                      bLdgPtr + (k+1) * numLoadBRowsPerIter * N * sizeof(float));
       }
 
       // FFMA loop.
