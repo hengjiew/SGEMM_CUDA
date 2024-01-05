@@ -12,7 +12,14 @@
 
 __device__ __forceinline__ void ldgsts32Async(const uint32_t &smem_addr,
                                               const void *gmem_ptr) {
-  asm volatile("cp.async.ca.shared.global [%0], [%1], 4, 4;\n"
+  asm volatile("cp.async.ca.shared.global [%0], [%1], 4;\n"
+               :
+               : "r"(smem_addr), "l"(gmem_ptr));
+}
+
+__device__ __forceinline__ void ldgsts128Async(const uint32_t &smem_addr,
+                                              const void *gmem_ptr) {
+  asm volatile("cp.async.ca.shared.global [%0], [%1], 16;\n"
                :
                : "r"(smem_addr), "l"(gmem_ptr));
 }
@@ -99,11 +106,12 @@ __global__ void __launch_bounds__(NUM_THREADS)
   constexpr uint numLoadARowsPerIter = NUM_THREADS / BK;
   const uint loadAX = threadIdx.x % BK;
   const uint loadAY = threadIdx.x / BK;
-  // Each thread load one element from B.
-  constexpr uint numLoadBIters = BK * BN / NUM_THREADS;
-  constexpr uint numLoadBRowsPerIter = NUM_THREADS / BN;
-  const uint loadBX = threadIdx.x % BN;
-  const uint loadBY = threadIdx.x / BN;
+  // Each thread load 4 elements from B.
+  constexpr uint VECSIZE = 4;
+  constexpr uint numLoadBIters = BK * BN / NUM_THREADS / VECSIZE;
+  constexpr uint numLoadBRowsPerIter = NUM_THREADS * VECSIZE / BN;
+  const uint loadBX = threadIdx.x * VECSIZE % BN;
+  const uint loadBY = threadIdx.x * VECSIZE / BN;
 
   // The FFMA loops overlap each round of loading with one computation iteration.
   // This requires the number of rounds is less than BK.
@@ -113,7 +121,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
   uint32_t aStsAddr =
       smemU32Addr(aSmem + (threadIdx.x % BK) * BMPadded + (threadIdx.x / BK));
   // B_smem has very similar layout as B global memory.
-  uint32_t bStsAddr = smemU32Addr(bSmem + threadIdx.x);
+  uint32_t bStsAddr = smemU32Addr(bSmem + threadIdx.x * VECSIZE);
 
   // MOve global memory pointer to current tile.
   const uint cRow = blockIdx.y * BM;
@@ -140,8 +148,8 @@ __global__ void __launch_bounds__(NUM_THREADS)
     // Load B from global memory to shared memory.
     #pragma unroll
     for (uint i = 0; i < numLoadBIters; ++i)
-      ldgsts32Async(bStsAddr + i * numLoadBRowsPerIter * BN * sizeof(float),
-                    bLdgPtr + i * numLoadBRowsPerIter * N * sizeof(float));
+      ldgsts128Async(bStsAddr + i * numLoadBRowsPerIter * BN * sizeof(float),
+                     bLdgPtr + i * numLoadBRowsPerIter * N * sizeof(float));
 
     ldgsts_commit();
     __syncthreads();
@@ -222,8 +230,8 @@ __global__ void __launch_bounds__(NUM_THREADS)
       }
       // Assumie BK > numLoadBIters
       if (k < numLoadBIters) {
-        ldgsts32Async(bStsAddr + k * numLoadBRowsPerIter * BN * sizeof(float),
-                      bLdgPtr + k * numLoadBRowsPerIter * N * sizeof(float));
+        ldgsts128Async(bStsAddr + k * numLoadBRowsPerIter * BN * sizeof(float),
+                       bLdgPtr + k * numLoadBRowsPerIter * N * sizeof(float));
       }
 
       // FFMA loop.

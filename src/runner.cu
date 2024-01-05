@@ -540,9 +540,11 @@ void runSgemmDoubleBuffering3(int M, int N, int K, float alpha, float *A,
   constexpr uint NUM_WARPS = K13_NUM_THREADS / 32;
 
   // warptile in threadblocktile
-  static_assert((K13_BN % K13_WN == 0) and (K13_BM % K13_WM == 0));
+  static_assert((K13_BN % K13_WN == 0) && (K13_BM % K13_WM == 0));
   static_assert((K13_BN / K13_WN) * (K13_BM / K13_WM) == NUM_WARPS);
   static_assert(K13_WN % K13_TN == 0 && K13_WM % K13_TM == 0);
+  static_assert(K13_NUM_THREADS * 4 % K13_BN == 0);
+  static_assert(K13_BN * K13_BK % (K13_NUM_THREADS * 4) == 0);
 
   dim3 gridDim(CEIL_DIV(N, K13_BN), CEIL_DIV(M, K13_BM));
   // std::cout << CEIL_DIV(N, K13_BN) << " " << CEIL_DIV(M, K13_BM) << "\n";
